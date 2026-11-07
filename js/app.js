@@ -157,17 +157,17 @@
   async function refreshFromOfficialSites() {
     var button = document.getElementById("fetch-rates");
     if (button) button.disabled = true;
-    setStatus("Reading the MTN tariff page…");
+    setStatus("Reading MTN…");
     var notes = [];
     try {
       var mtnHtml = await fetchText(state.sources.mtn);
       var parsed = window.OfficialRates.parseMtn(mtnHtml);
       Object.keys(parsed).forEach(function (key) { state.mtn[key] = parsed[key]; });
-      notes.push("MTN table updated from mtn.co.ug.");
+      notes.push("MTN updated.");
     } catch (error) {
-      notes.push("MTN page could not be read (" + error.message + "). Showing the saved MTN sheet.");
+      notes.push("MTN could not be read. Saved sheet shown.");
     }
-    setStatus("Reading the Airtel page…");
+    setStatus("Reading Airtel…");
     try {
       var airtelHtml = await fetchText(state.sources.airtel);
       var headline = window.OfficialRates.parseAirtelHeadline(airtelHtml);
@@ -176,16 +176,16 @@
       var sendCap = state.airtel.send[state.airtel.send.length - 1].fee;
       var withdrawCap = state.airtel.agent[state.airtel.agent.length - 1].fee;
       if (headline.maxSendFee && headline.maxSendFee !== sendCap) {
-        notes.push("Airtel’s page now says the highest send fee is " + ugx(headline.maxSendFee) + ". The saved band table still tops out at " + ugx(sendCap) + ".");
+        notes.push("Airtel send cap is now " + ugx(headline.maxSendFee) + ". Table still tops out at " + ugx(sendCap) + ".");
       } else if (headline.maxWithdrawFee && headline.maxWithdrawFee !== withdrawCap) {
-        notes.push("Airtel’s page now says the highest withdrawal fee is " + ugx(headline.maxWithdrawFee) + ". The saved band table still tops out at " + ugx(withdrawCap) + ".");
+        notes.push("Airtel withdrawal cap is now " + ugx(headline.maxWithdrawFee) + ". Table still tops out at " + ugx(withdrawCap) + ".");
       } else if (headline.maxSendFee) {
-        notes.push("Airtel’s page still states a highest send fee of " + ugx(headline.maxSendFee) + " and a highest withdrawal fee of " + ugx(headline.maxWithdrawFee) + ". No full HTML table was published, so the band sheet is unchanged.");
+        notes.push("Airtel caps unchanged. No new table.");
       } else {
-        notes.push("Airtel’s page did not include a fee table or the usual fee sentence. Saved Airtel bands kept.");
+        notes.push("Airtel table not found. Saved bands kept.");
       }
     } catch (error) {
-      notes.push("Airtel page could not be read (" + error.message + ").");
+      notes.push("Airtel could not be read.");
     }
     state.fetchedAt = new Date().toISOString();
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (error) { /* private mode */ }

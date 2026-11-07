@@ -51,7 +51,20 @@ function taxAt(amount) {
 }
 
 function ad(slot) {
-  return `<aside class="ad-slot" hidden data-ad-position="${slot}" aria-label="Advertisement"><span class="ad-label">Advertisement</span></aside>`;
+  return `<aside class="ad-slot ad-${slot}" hidden data-ad-position="${slot}" aria-label="Advertisement"><span class="ad-label">Advertisement</span></aside>`;
+}
+
+function placeInContent(html) {
+  const slot = ad("in-content");
+  const formAt = html.indexOf("</form>");
+  if (formAt >= 0) return html.slice(0, formAt + 7) + slot + html.slice(formAt + 7);
+  const marker = "</table></div>";
+  const tableAt = html.indexOf(marker);
+  if (tableAt >= 0) {
+    const end = tableAt + marker.length;
+    return html.slice(0, end) + slot + html.slice(end);
+  }
+  return html + slot;
 }
 
 function crumbs(items) {
@@ -111,8 +124,9 @@ function layout({ file, title, description, heading, body, crumbItems = [], faq 
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}">
-  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
   <link rel="canonical" href="${canonical}">
+  <link rel="sitemap" type="application/xml" href="${site}/sitemap.xml">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Mobile Money Rates Uganda">
   <meta property="og:title" content="${esc(title)}">
@@ -132,18 +146,30 @@ function layout({ file, title, description, heading, body, crumbItems = [], faq 
   <script type="application/ld+json">${JSON.stringify(webPage)}</script>
   <script type="application/ld+json">${JSON.stringify(crumb.schema)}</script>
   ${faqSchema ? `<script type="application/ld+json">${JSON.stringify(faqSchema)}</script>` : ""}
+  ${file === "index.html" ? `<script type="application/ld+json">${JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "Uganda mobile money fee calculator",
+    applicationCategory: "FinanceApplication",
+    operatingSystem: "Web",
+    url: site + "/",
+    offers: { "@type": "Offer", price: "0", priceCurrency: "UGX" },
+    description: "MTN MoMo and Airtel Money charges in Uganda."
+  })}</script>` : ""}
 </head>
 <body>
   <div class="rule"></div>
+  <div class="page-shell">
+  ${ad("side-left")}
+  <div class="page-core">
   <header class="mast wrap">
-    <p class="kicker">Uganda shilling fee desk</p>
     <a class="brand" href="index.html">Mobile Money Rates</a>
-    <p class="dateline">MTN MoMo and Airtel Money · Checked <time id="checked-at" datetime="${esc(rates.fetchedAt)}">${esc(checked)}</time></p>
+    <p class="dateline">Checked <time id="checked-at" datetime="${esc(rates.fetchedAt)}">${esc(checked)}</time> · <span id="visitor-count">—</span> visitors</p>
     <nav class="nav" aria-label="Primary">
       ${nav.map(([href, label]) => `<a href="${href}"${href === file ? ' aria-current="page"' : ""}>${label}</a>`).join("")}
     </nav>
     <div class="mast-actions">
-      <button id="fetch-rates" type="button">Fetch latest rates from MTN and Airtel</button>
+      <button id="fetch-rates" type="button">Update rates</button>
       <p id="fetch-status" role="status"></p>
     </div>
   </header>
@@ -151,14 +177,14 @@ function layout({ file, title, description, heading, body, crumbItems = [], faq 
   <main class="wrap" id="content">
     ${crumb.html}
     <h1>${heading}</h1>
-    ${body}
+    ${placeInContent(body)}
   </main>
-  ${ad("footer")}
+  ${ad("bottom")}
   <footer class="site-footer">
     <div class="wrap foot-grid">
       <div>
         <strong>Mobile Money Rates Uganda</strong>
-        <p>An independent guide to published MTN and Airtel mobile money charges. This site does not move money and is not MTN or Airtel. Confirm the fee on the phone prompt before you enter your PIN. Agents must not add a separate cash fee.</p>
+        <p>MTN and Airtel fee tables. Not a wallet. Confirm the fee on your phone before you enter your PIN.</p>
       </div>
       <div>
         <strong>Charges</strong>
@@ -188,9 +214,13 @@ function layout({ file, title, description, heading, body, crumbItems = [], faq 
       </div>
     </div>
   </footer>
+  </div>
+  ${ad("side-right")}
+  </div>
   <script src="js/parse-official.js"></script>
   <script src="js/app.js"></script>
   <script src="js/ads.js"></script>
+  <script src="js/counter.js"></script>
 </body>
 </html>
 `;
@@ -249,23 +279,22 @@ function scheduleTable(schedule, headers = ["Amount (UGX)", "Fee (UGX)"]) {
 function calculator(intro) {
   return `
   <p class="lede">${intro}</p>
-  ${ad("in-article")}
   <form class="panel" id="calculator">
     <div class="calc-grid">
       <div>
-        <label for="amount">Amount in Uganda shillings</label>
+        <label for="amount">Amount (UGX)</label>
         <input id="amount" name="amount" inputmode="numeric" value="50000" min="500" required>
       </div>
       <div>
-        <label for="action">What are you doing?</label>
+        <label for="action">Transaction</label>
         <select id="action" name="action"></select>
       </div>
-      <button type="submit">Check the charge</button>
+      <button type="submit">Check charge</button>
     </div>
     <p id="calc-summary" class="dateline"></p>
     <div id="results" class="results" aria-live="polite"></div>
-  </form>
-  <p>The figure above the breakdown is the extra amount deducted from the wallet. The person receiving a transfer still gets the full amount you entered. On a cash withdrawal, the agent pays you the amount you entered, and the wallet is charged that amount plus the fee plus the 0.5% tax.</p>`;
+    <p class="fine">The receiver gets the full amount. Cash-out adds the fee plus 0.5% tax.</p>
+  </form>`;
 }
 
 const examples = [10000, 20000, 50000, 100000, 200000, 500000, 1000000, 2000000];
@@ -295,10 +324,7 @@ layout({
   crumbItems: [],
   faq: homeFaq,
   body: `
-  ${calculator("Type an amount and see what MTN MoMo and Airtel Money deduct in Uganda. Figures start from the tariff sheets on mtn.co.ug and airtel.co.ug, checked " + esc(checked) + ".")}
-  ${ad("mid-content")}
-  <h2>What you pay, in plain language</h2>
-  <p>Every mobile money charge in Uganda is a flat fee for a band, not a percentage of the amount. UGX 20,000 and UGX 30,000 can sit in the same band and cost the same network fee. Cash withdrawal adds a second charge: a government tax of 0.5% of the amount you take out. Sending to a phone, paying a bill, and moving money to a bank do not attract that 0.5% tax.</p>
+  ${calculator("MTN and Airtel fees. Checked " + esc(checked) + ".")}
   <div class="cards">
     <article class="card">
       <h3>MTN MoMo</h3>
@@ -311,7 +337,7 @@ layout({
       <p><a href="airtel-money-charges.html">Full Airtel tariff table</a></p>
     </article>
   </div>
-  <h2>Worked examples people search for</h2>
+  <h2>Common amounts</h2>
   ${table(
     ["Amount", "MTN send", "Airtel send", "MTN agent fee", "Airtel agent fee", "Withdrawal tax"],
     examples.map((amount) => [
@@ -323,12 +349,22 @@ layout({
       esc(ugx(taxAt(amount)))
     ])
   )}
-  <p>Open any amount for the wallet balance you need before you confirm. Compare the two networks on the <a href="mtn-vs-airtel.html">MTN vs Airtel charges</a> page, or read how the <a href="withdrawal-tax.html">0.5% mobile money tax</a> is calculated.</p>
-  <h2>Where these numbers come from</h2>
-  <p class="note">${esc(rates.mtn.note)} Source: <a href="${esc(rates.sources.mtn)}">MTN Mobile Money tariffs</a>.</p>
-  <p class="note airtel">${esc(rates.airtel.note)} Source: <a href="${esc(rates.sources.airtel)}">Airtel Money</a>.</p>
+  <h2>Look up</h2>
+  <ul class="clean searches">
+    <li><a href="mtn-mobile-money-charges.html">MTN mobile money charges</a></li>
+    <li><a href="airtel-money-charges.html">Airtel Money charges</a></li>
+    <li><a href="mtn-vs-airtel.html">MTN vs Airtel charges</a></li>
+    <li><a href="withdrawal-tax.html">mobile money withdrawal tax</a></li>
+    <li><a href="send-to-bank.html">mobile money to bank charges</a></li>
+    <li><a href="atm-withdrawal.html">MTN ATM withdrawal charges</a></li>
+    <li><a href="bill-payments.html">UMEME, NWSC and school fees charges</a></li>
+    <li><a href="how-to-send-mtn.html">send MTN money *165#</a></li>
+    <li><a href="how-to-send-airtel.html">send Airtel money *185#</a></li>
+    <li><a href="limits.html">MTN and Airtel money limits</a></li>
+  </ul>
+  <p class="fine">Source: <a href="${esc(rates.sources.mtn)}">MTN tariffs</a> and <a href="${esc(rates.sources.airtel)}">Airtel Money</a>.</p>
   <div class="faq">
-    <h2>Questions this calculator answers</h2>
+    <h2>FAQ</h2>
     ${homeFaq.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}
   </div>`
 });
@@ -345,7 +381,6 @@ layout({
   ],
   body: `
   <p class="lede">This is the MTN Uganda Mobile Money tariff: send, bank, agent withdrawal, ATM withdrawal, Senkyu points, the published tax range, and bill-payment fees.</p>
-  ${ad("in-article")}
   <p class="note">${esc(rates.mtn.note)}</p>
   ${mtnTable()}
   <h2>How to read the tax columns</h2>
@@ -375,7 +410,6 @@ layout({
   ],
   body: `
   <p class="lede">Airtel Money send and withdrawal bands for Uganda, plus utility payments, other payments, bank transfer, and international transfer.</p>
-  ${ad("in-article")}
   <p class="note airtel">${esc(rates.airtel.note)}</p>
   ${airtelTable()}
   <h2>Airtel Money to bank</h2>
@@ -420,7 +454,6 @@ layout({
   ],
   body: `
   <p class="lede">Side-by-side MTN MoMo and Airtel Money charges for the amounts Ugandans actually send and withdraw. Withdrawal totals include the 0.5% tax at that exact amount.</p>
-  ${ad("in-article")}
   ${table(["Amount (UGX)", "MTN send", "Airtel send", "Cheaper to send", "MTN withdraw all-in", "Airtel withdraw all-in", "Cheaper to withdraw"], compareRows())}
   <p>Below UGX 500,000 the published send and agent fees are the same shilling. The gap opens on larger cash-outs and on sends above UGX 500,000, where Airtel’s published cap is lower. Bill-payment menus are named differently, so compare those on the <a href="bill-payments.html">bill payment charges</a> page rather than assuming the send fee applies.</p>
   <p><a href="index.html">Open the calculator</a> for an amount that is not in this list.</p>`
@@ -438,7 +471,6 @@ layout({
   ],
   body: `
   <p class="lede">The withdrawal tax is 0.5% of the cash you take out. MTN prints the bottom and top of that tax for each band. This page turns those ranges into the exact shilling for a chosen amount.</p>
-  ${ad("in-article")}
   <p>Withdraw UGX 50,000 on MTN: network fee UGX ${ugx(feeAt(rates.mtn.agent, 50000))}, tax UGX ${ugx(taxAt(50000))}, total extra UGX ${ugx(feeAt(rates.mtn.agent, 50000) + taxAt(50000))}. The same tax applies on Airtel. The network fee at that amount is also UGX ${ugx(feeAt(rates.airtel.agent, 50000))}.</p>
   ${table(
     ["Amount withdrawn", "Tax at 0.5%", "MTN fee", "MTN total extra", "Airtel fee", "Airtel total extra"],
@@ -471,7 +503,6 @@ layout({
   ],
   body: `
   <p class="lede">Fees for pushing money from MTN MoMo or Airtel Money into a bank account. This is not the same as withdrawing cash.</p>
-  ${ad("in-article")}
   <h2>MTN send to bank</h2>
   ${scheduleTable(rates.mtn.bank)}
   <h2>Airtel Money to bank</h2>
@@ -491,7 +522,6 @@ layout({
   ],
   body: `
   <p class="lede">MTN lists a separate ATM withdrawal column. It is higher than the agent fee on small amounts and blank above UGX 1,000,000. The 0.5% tax still applies.</p>
-  ${ad("in-article")}
   ${scheduleTable(rates.mtn.atm)}
   <p>Airtel’s public tariff material used here does not include an ATM column. If your bank’s ATM offers Airtel cash-out, the handset prompt is the fee that will be deducted.</p>`
 });
@@ -508,7 +538,6 @@ layout({
   ],
   body: `
   <p class="lede">Paying a bill from the wallet is cheaper than withdrawing cash and paying at a counter. These are the published payment fees, with no 0.5% withdrawal tax.</p>
-  ${ad("in-article")}
   <h2>MTN: Azam TV, ReadyPay, school fees, Solar Now</h2>
   ${scheduleTable(rates.mtn.school)}
   <h2>MTN: UMEME, NWSC, DStv, StarTimes, NSSF, Multiplex</h2>
@@ -532,7 +561,6 @@ layout({
   ],
   body: `
   <p class="lede">Sending on MTN uses *165#. The fee depends only on the amount, and it is the same for an MTN wallet or another network on the current tariff.</p>
-  ${ad("in-article")}
   <ol class="steps">
     <li>Dial *165# and choose Send Money.</li>
     <li>Choose a mobile number, or the option for someone without mobile money if you are creating a voucher.</li>
@@ -557,7 +585,6 @@ layout({
   ],
   body: `
   <p class="lede">Airtel Money sending in Uganda starts at UGX 100. The highest published fee to another Airtel Money user is UGX ${ugx(rates.airtel.maxSendFee)}.</p>
-  ${ad("in-article")}
   <ol class="steps">
     <li>Dial *185#.</li>
     <li>Choose Send Money and enter the receiver’s number.</li>
@@ -582,7 +609,6 @@ layout({
   ],
   body: `
   <p class="lede">Limits published by the networks, and the services they list at no charge.</p>
-  ${ad("in-article")}
   ${table(
     ["Limit", "MTN MoMo", "Airtel Money"],
     [
@@ -617,8 +643,7 @@ layout({
   crumbItems: [[null, "FAQ"]],
   faq: faqPairs,
   body: `<p class="lede">Short answers to the searches people run before they send or withdraw mobile money in Uganda.</p>
-  ${ad("in-article")}
-  <div class="faq">${faqPairs.map(([q, a]) => `<details open><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>`
+  <div class="faq">${faqPairs.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>`
 });
 
 layout({
@@ -629,7 +654,6 @@ layout({
   crumbItems: [[null, "About"]],
   body: `
   <p class="lede">Mobile Money Rates Uganda is an independent page for published MTN and Airtel charges. It is not a wallet, an agent, or part of MTN or Airtel.</p>
-  ${ad("in-article")}
   <p>MTN numbers are parsed from the HTML table at mtn.co.ug. Airtel’s marketing and help pages state the fee caps and do not currently expose the full grid as a table, so the Airtel bands are the sheet Airtel published, kept in line with those caps. The button at the top fetches both websites again in your browser.</p>
   <p>The site is published for the domain mobilemoneyratesug.cc. Nothing here moves money. The PIN prompt on your phone is the charge you will pay.</p>`
 });
@@ -642,13 +666,14 @@ layout({
   crumbItems: [[null, "Privacy"]],
   body: `
   <p>This policy covers mobilemoneyratesug.cc. The site calculates published mobile-money fees. It does not ask for your phone number, PIN, or wallet balance.</p>
-  ${ad("in-article")}
   <h2>What the site stores</h2>
   <p>If you press “Fetch latest rates”, the browser saves the tariff it just read in local storage on your device so the calculator can use it on the next visit. That data stays on your device. You can clear it in your browser settings.</p>
   <h2>Advertising</h2>
   <p>Google AdSense (publisher ca-pub-9402272089735179) may place ads. Google and its partners use cookies to serve and measure ads, including ads based on your visits to this and other sites. You can opt out of personalised advertising in <a href="https://adssettings.google.com/">Google’s ad settings</a>. See also <a href="https://policies.google.com/technologies/ads">how Google uses advertising cookies</a>.</p>
+  <h2>Visitors</h2>
+  <p>A counter on each page stores one number: how many browsers have opened the site. It does not store your name, phone number, or wallet. Refreshing the same day does not add another visit.</p>
   <h2>Logs</h2>
-  <p>GitHub Pages, which hosts this site, may keep standard server logs such as IP address and browser type for security and diagnostics.</p>
+  <p>Cloudflare, which serves this site, may keep standard request logs such as IP address and browser type for security and diagnostics.</p>
   <h2>Contact</h2>
   <p>Privacy questions: <a href="mailto:hello@mobilemoneyratesug.cc">hello@mobilemoneyratesug.cc</a>.</p>`
 });
@@ -661,7 +686,6 @@ layout({
   crumbItems: [[null, "Contact"]],
   body: `
   <p>For a correction to a published fee, email <a href="mailto:hello@mobilemoneyratesug.cc">hello@mobilemoneyratesug.cc</a>. Include the amount, the network, and a photo of the handset prompt if you have one.</p>
-  ${ad("in-article")}
   <p>This mailbox cannot reverse a transaction. For a wrong PIN, a missing transfer, or an agent dispute, use the network:</p>
   <ul class="clean">
     <li>MTN customer service: 0771 001 000, or customerservice.ug@mtn.com, as printed on the MTN tariff page. Toll-free 100.</li>
@@ -697,7 +721,6 @@ for (const amount of examples) {
     ],
     body: `
     <p class="lede">Published network fees for sending or withdrawing ${label}, and the wallet balance each transaction needs.</p>
-    ${ad("in-article")}
     ${table(
       ["Transaction", "MTN fee", "MTN tax", "MTN wallet needed", "Airtel fee", "Airtel tax", "Airtel wallet needed"],
       [
